@@ -35,5 +35,5 @@ variable "webserver-port" {
 
 variable "dns-name" {
   type    = string
-  default = "uksysadmin.com."
+  default = "yourdomainhere.com."
 }
