@@ -1,0 +1,73 @@
+---
+
+- hosts: "{{ passed_in_hosts }}"
+  become: yes
+  remote_user: ec2-user
+  become_user: root
+  tasks:
+    - name: install dependencies
+      yum:
+        name:
+          - wget
+          - java-1.8.0-openjdk-devel
+          - git
+        state: present
+
+    - name: clone preconfigured jenkins files
+      git:
+        repo: https://github.com/linuxacademy/content-terraform-jenkins.git
+        dest: /tmp/jenkins
+
+    - name: setup jenkins repo
+      get_url:
+        url: https://pkg.jenkins.io/redhat/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+
+    - name: import jenkins gpg key
+      rpm_key:
+        state: present
+        key: https://pkg.jenkins.io/redhat/jenkins.io.key
+
+    - name: install jenkins
+      yum:
+        name: jenkins
+        state: present
+
+    - name: temporarily stop jenkins
+      service:
+        name: jenkins
+        state: stopped
+
+    - name: modify user shell
+      user:
+        name: jenkins
+        shell: /bin/bash
+
+    - name: delete jenkins default dir
+      file:
+        state: absent
+        path: /var/lib/jenkins
+
+    - name: copy over cloned jenkins to /var/lib/jenkins
+      copy:
+        remote_src: yes
+        src: /tmp/jenkins/jenkins
+        dest: /var/lib
+
+    - name: set ownership on jenkins files
+      file:
+        path: /var/lib/jenkins
+        state: directory
+        recurse: yes
+        owner: jenkins
+
+    - name: start and enable jenkins
+      service:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    - name: wait until jenkins is up
+      shell: result_first=1; while [[ $result_first != 0 ]]; do if [[ `grep 'Jenkins is fully up and running' /var/log/jenkins/jenkins.log` ]];then result_first=0;else sleep 4;fi;done
+      register: result
+      until: result.rc == 0
